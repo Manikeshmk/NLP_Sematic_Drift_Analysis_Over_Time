@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Semantic Drift Analysis — B.Tech NLP Major Project</title>
+  <meta name="description"
+    content="Explore how word meanings shift over 200 years using Stanford/Google Ngram historical word embeddings. B.Tech NLP Major Project." />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <!-- Plotly.js for interactive constellation chart -->
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+
+<body>
+
+  <!-- ══ HEADER ══════════════════════════════════════════════════════════════ -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="brand-icon">⚗</span>
+        <div>
+          <h1 class="brand-title">Semantic Drift Analysis</h1>
+          <p class="brand-sub">How Language Evolves Over Time · NLP Major Project</p>
+        </div>
+      </div>
+      <div class="header-status" id="headerStatus">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Connecting…</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══ NAV TABS ════════════════════════════════════════════════════════════ -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="explorer">🔍 Word Explorer</button>
+    <button class="tab-btn" data-tab="constellation">🌌 Drift Constellation</button>
+    <button class="tab-btn" data-tab="timeline">📈 Timeline</button>
+    <button class="tab-btn" data-tab="heatmap">🌡 Heat Map</button>
+    <button class="tab-btn" data-tab="topWords">🏆 Top Drifted</button>
+    <button class="tab-btn" data-tab="concepts">🔗 Concept Relations</button>
+    <button class="tab-btn" data-tab="caseStudies">📚 Case Studies</button>
+    <button class="tab-btn" data-tab="about">ℹ About</button>
+    <a href="report.html" class="tab-btn" style="text-decoration:none;color:var(--gold);border-color:rgba(250,204,21,0.3);background:rgba(250,204,21,0.06)" target="_blank">📄 Drift Report</a>
+  </nav>
+
+  <!-- ══ MAIN ════════════════════════════════════════════════════════════════ -->
+  <main class="main-content">
+
+    <!-- ─── TAB: WORD EXPLORER ──────────────────────────────────────────────── -->
+    <section class="tab-panel active" id="tab-explorer">
+      <div class="panel-header">
+        <h2>Word Explorer</h2>
+        <p>Analyse the semantic shift of any word between two decades. Explores nearest-neighbour shifts and t-SNE
+          projections.</p>
+      </div>
+
+      <div class="control-card">
+        <div class="control-row">
+          <div class="field-group">
+            <label for="explorerWord">Target Word</label>
+            <input type="text" id="explorerWord" placeholder="e.g.  network, virus, awful" autocomplete="off" />
+          </div>
+          <div class="field-group field-narrow">
+            <label for="explorerYearA">From Decade</label>
+            <select id="explorerYearA"></select>
+          </div>
+          <div class="field-group field-narrow">
+            <label for="explorerYearB">To Decade</label>
+            <select id="explorerYearB"></select>
+          </div>
+          <button class="btn-primary" id="explorerBtn" onclick="runExplorer()">
+            <span class="btn-icon">▷</span> Analyse
+          </button>
+        </div>
+        <!-- Quick word buttons -->
+        <div class="quick-words">
+          <span class="quick-label">Quick:</span>
+          <button class="quick-btn" onclick="quickWord('network')">network</button>
+          <button class="quick-btn" onclick="quickWord('virus')">virus</button>
+          <button class="quick-btn" onclick="quickWord('computer')">computer</button>
+          <button class="quick-btn" onclick="quickWord('awful')">awful</button>
+          <button class="quick-btn" onclick="quickWord('nice')">nice</button>
+          <button class="quick-btn" onclick="quickWord('broadcast')">broadcast</button>
+          <button class="quick-btn" onclick="quickWord('artificial')">artificial</button>
+        </div>
+      </div>
+
+      <div id="explorerResults" class="results-area hidden">
+
+        <!-- Drift Score Card -->
+        <div class="metrics-row" id="explorerMetrics"></div>
+
+        <!-- Neighbour Tables -->
+        <div class="two-col-grid">
+          <div class="card" id="nbrsOld"></div>
+          <div class="card" id="nbrsNew"></div>
+        </div>
+
+        <!-- t-SNE Chart -->
+        <div class="card chart-card">
+          <div class="card-title">t-SNE Neighbourhood Map</div>
+          <div class="chart-wrapper" id="tsneChart">
+            <div class="chart-loading">Generating…</div>
+          </div>
+        </div>
+
+        <!-- Neighbour Shift Diagram -->
+        <div class="card chart-card">
+          <div class="card-title">Neighbour Shift Diagram</div>
+          <div class="chart-wrapper" id="nsChart">
+            <div class="chart-loading">Generating…</div>
+          </div>
+        </div>
+
+        <!-- Case Study -->
+        <div class="card" id="caseStudyCard" style="display:none">
+          <div class="card-title">📖 Historical Case Study</div>
+          <div id="caseStudyBody"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── TAB: TIMELINE ───────────────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-timeline">
+      <div class="panel-header">
+        <h2>Drift Timeline</h2>
+        <p>Track how a word's meaning drifts across <em>all</em> loaded decades relative to its earliest occurrence.</p>
+      </div>
+
+      <div class="control-card">
+        <div class="control-row">
+          <div class="field-group">
+            <label for="timelineWord">Target Word</label>
+            <input type="text" id="timelineWord" placeholder="e.g.  computer" autocomplete="off" />
+          </div>
+          <button class="btn-primary" onclick="runTimeline()">▷ Generate</button>
+        </div>
+        <div class="quick-words">
+          <span class="quick-label">Quick:</span>
+          <button class="quick-btn" onclick="quickTimeline('virus')">virus</button>
+          <button class="quick-btn" onclick="quickTimeline('network')">network</button>
+          <button class="quick-btn" onclick="quickTimeline('computer')">computer</button>
+          <button class="quick-btn" onclick="quickTimeline('nice')">nice</button>
+          <button class="quick-btn" onclick="quickTimeline('awful')">awful</button>
+        </div>
+      </div>
+
+      <div id="timelineResults" class="results-area hidden">
+        <div class="card chart-card">
+          <div class="card-title" id="timelineTitle">Semantic Drift Timeline</div>
+          <div class="chart-wrapper" id="timelineChart"></div>
+        </div>
+
+        <div class="card" id="timelineTable">
+          <div class="card-title">Decade-by-Decade Scores</div>
+          <div id="timelineTableBody"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── TAB: HEATMAP ────────────────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-heatmap">
+      <div class="panel-header">
+        <h2>Multi-Word Heat Map</h2>
+        <p>Compare semantic drift of multiple words simultaneously across all decades.</p>
+      </div>
+
+      <div class="control-card">
+        <div class="field-group">
+          <label for="heatmapWords">Words (comma-separated, max 15)</label>
+          <input type="text" id="heatmapWords" placeholder="e.g.  network, virus, computer, awful, nice, broadcast" />
+        </div>
+        <button class="btn-primary" onclick="runHeatmap()" style="margin-top:12px">▷ Generate Heatmap</button>
+        <div class="quick-words" style="margin-top:10px">
+          <span class="quick-label">Presets:</span>
+          <button class="quick-btn" onclick="setHeatmapPreset('tech')">Tech Words</button>
+          <button class="quick-btn" onclick="setHeatmapPreset('emotion')">Emotion Words</button>
+          <button class="quick-btn" onclick="setHeatmapPreset('society')">Society Words</button>
+        </div>
+      </div>
+
+      <div id="heatmapResults" class="results-area hidden">
+        <div class="card chart-card large">
+          <div class="card-title">Semantic Drift Heatmap (rows=words, cols=decades)</div>
+          <div class="chart-wrapper" id="heatmapChart"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── TAB: TOP DRIFTED ─────────────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-topWords">
+      <div class="panel-header">
+        <h2>Top Drifted Words</h2>
+        <p>Globally rank words by how much their meaning changed between two decades. Also shows a drift word-cloud.</p>
+      </div>
+
+      <div class="control-card">
+        <div class="control-row">
+          <div class="field-group field-narrow">
+            <label for="topYearA">From Decade</label>
+            <select id="topYearA"></select>
+          </div>
+          <div class="field-group field-narrow">
+            <label for="topYearB">To Decade</label>
+            <select id="topYearB"></select>
+          </div>
+          <div class="field-group field-narrow">
+            <label for="topN">Top N</label>
+            <select id="topN">
+              <option value="15">15</option>
+              <option value="20" selected>20</option>
+              <option value="30">30</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+          <button class="btn-primary" onclick="runTopDrifted()">▷ Rank</button>
+        </div>
+        <p class="hint">⚠ This computes drift for the entire shared vocabulary — may take 15–60 seconds depending on
+          dataset size.</p>
+      </div>
+
+      <div id="topResults" class="results-area hidden">
+        <div class="two-col-grid">
+          <div class="card chart-card">
+            <div class="card-title">Bar Chart</div>
+            <div class="chart-wrapper" id="topBarChart"></div>
+          </div>
+          <div class="card chart-card">
+            <div class="card-title">Word Cloud</div>
+            <div class="chart-wrapper" id="topWordCloud"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Ranked List</div>
+          <div id="topTable"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── TAB: CONCEPT RELATIONS ───────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-concepts">
+      <div class="panel-header">
+        <h2>Concept Relation Tracker</h2>
+        <p>Track how the semantic similarity between word pairs evolves across decades (convergence or divergence).</p>
+      </div>
+
+      <div class="control-card">
+        <div class="field-group">
+          <label>Word Pairs (one per line, format: word1, word2)</label>
+          <textarea id="pairsInput" rows="4"
+            placeholder="network, computer&#10;virus, disease&#10;artificial, natural&#10;awful, terrible"></textarea>
+        </div>
+        <button class="btn-primary" onclick="runConcepts()" style="margin-top:12px">▷ Track Relations</button>
+      </div>
+
+      <div id="conceptResults" class="results-area hidden">
+        <div class="card chart-card large">
+          <div class="card-title">Similarity Over Time</div>
+          <div class="chart-wrapper" id="conceptChart"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── TAB: CASE STUDIES ────────────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-caseStudies">
+      <div class="panel-header">
+        <h2>Curated Case Studies</h2>
+        <p>Famous examples of semantic change documented in linguistics literature. Click any card to run its analysis.
+        </p>
+      </div>
+      <div class="case-grid" id="caseGrid"></div>
+    </section>
+
+    <!-- ─── TAB: ABOUT ───────────────────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-about">
+      <div class="panel-header">
+        <h2>About This Project</h2>
+      </div>
+
+      <div class="about-grid">
+        <div class="card about-card">
+          <div class="card-title">📌 Project Details</div>
+          <table class="info-table">
+            <tr>
+              <td>Course</td>
+              <td>Natural Language Processing (B.Tech)</td>
+            </tr>
+            <tr>
+              <td>Project Title</td>
+              <td>Semantic Drift Analysis Over Time</td>
+            </tr>
+            <tr>
+              <td>Dataset</td>
+              <td>Stanford / Google Ngram SGNS Embeddings</td>
+            </tr>
+            <tr>
+              <td>Source</td>
+              <td><a href="http://snap.stanford.edu/historical_embeddings/"
+                  target="_blank">snap.stanford.edu/historical_embeddings</a></td>
+            </tr>
+            <tr>
+              <td>Time Span</td>
+              <td>1800s – 2000s (decade granularity)</td>
+            </tr>
+            <tr>
+              <td>Vocabulary</td>
+              <td>~65,000 words per decade</td>
+            </tr>
+            <tr>
+              <td>Vector Dim</td>
+              <td>300-dimensional SGNS</td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="card about-card">
+          <div class="card-title">⚙ Methodology</div>
+          <ol class="method-list">
+            <li><strong>Data Loading</strong> — Pre-trained SGNS word vectors from each decade loaded via NumPy</li>
+            <li><strong>Cosine Distance</strong> — Drift score = 1 − cosine_similarity(v_t₁, v_t₂)</li>
+            <li><strong>Neighbour Shift</strong> — Jaccard overlap of top-K nearest neighbours between eras</li>
+            <li><strong>Procrustes Alignment</strong> — SVD-based orthogonal rotation to align embedding spaces</li>
+            <li><strong>t-SNE Projection</strong> — 2-D visualisation of neighbourhood structure</li>
+            <li><strong>Global Ranking</strong> — All shared high-frequency words ranked by drift score</li>
+            <li><strong>Concept Tracking</strong> — Pairwise similarity between concepts across decades</li>
+          </ol>
+        </div>
+
+        <div class="card about-card">
+          <div class="card-title">🔬 Types of Semantic Change</div>
+          <div class="change-types">
+            <div class="change-type">
+              <span class="ct-badge ct-broadening">Broadening</span>
+              <p>Word gains new, wider meaning (broadcast: seeds → media)</p>
+            </div>
+            <div class="change-type">
+              <span class="ct-badge ct-narrowing">Narrowing</span>
+              <p>Word restricts to a subset of its old meaning</p>
+            </div>
+            <div class="change-type">
+              <span class="ct-badge ct-amelioration">Amelioration</span>
+              <p>Word gains positive connotation over time (nice)</p>
+            </div>
+            <div class="change-type">
+              <span class="ct-badge ct-pejoration">Pejoration</span>
+              <p>Word gains negative connotation over time (awful)</p>
+            </div>
+            <div class="change-type">
+              <span class="ct-badge ct-metaphor">Metaphorical Extension</span>
+              <p>Concrete meaning → abstract/figurative (virus: biology → computing)</p>
+            </div>
+            <div class="change-type">
+              <span class="ct-badge ct-stable">Stable</span>
+              <p>Word has consistent semantic neighbourhood across time</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card about-card">
+          <div class="card-title">🛠 Tech Stack</div>
+          <div class="tech-stack">
+            <span class="tech-badge">Python 3.14</span>
+            <span class="tech-badge">NumPy</span>
+            <span class="tech-badge">scikit-learn</span>
+            <span class="tech-badge">Flask</span>
+            <span class="tech-badge">Matplotlib</span>
+            <span class="tech-badge">Seaborn</span>
+            <span class="tech-badge">Plotly</span>
+            <span class="tech-badge">WordCloud</span>
+            <span class="tech-badge">Stanford SGNS</span>
+            <span class="tech-badge">t-SNE</span>
+            <span class="tech-badge">Procrustes</span>
+            <span class="tech-badge">Vanilla CSS</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── TAB: DRIFT CONSTELLATION ──────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-constellation">
+      <div class="panel-header">
+        <h2>🌌 Drift Constellation</h2>
+        <p>
+          Enter any sentence, idiom, or phrase. Every content word traces its own
+          drift arc across <strong>all 20 decades (1800→1990)</strong>, while a
+          bold line shows the overall sentence meaning shift.
+          A correlation heatmap reveals <em>how word relationships restructure over time</em>.
+        </p>
+        <div class="innovation-badge">✨ Novel — no existing NLP tool provides this view</div>
+      </div>
+
+      <div class="control-card">
+        <div class="field-group" style="margin-bottom:14px">
+          <label for="constInput">Sentence / Idiom / Phrase</label>
+          <textarea id="constInput" rows="3"
+            placeholder="e.g.  Broadcast the artificial intelligence virus across the social computer network."></textarea>
+        </div>
+        <div class="control-row">
+          <div class="field-group field-narrow">
+            <label for="constYearA">From Decade</label>
+            <select id="constYearA"></select>
+          </div>
+          <div class="field-group field-narrow">
+            <label for="constYearB">To Decade</label>
+            <select id="constYearB"></select>
+          </div>
+          <button class="btn-primary" id="constBtn" onclick="runConstellation()">
+            <span class="btn-icon">🌌</span> Generate Constellation
+          </button>
+        </div>
+        <!-- Preset phrases -->
+        <div class="quick-words" style="margin-top:14px">
+          <span class="quick-label">Idioms &amp; Phrases:</span>
+          <button class="quick-btn" onclick="setConstPreset('tech')">Technology</button>
+          <button class="quick-btn" onclick="setConstPreset('idiom1')">Break the ice</button>
+          <button class="quick-btn" onclick="setConstPreset('idiom2')">Viral broadcast</button>
+          <button class="quick-btn" onclick="setConstPreset('idiom3')">Network of power</button>
+          <button class="quick-btn" onclick="setConstPreset('idiom4')">Natural selection</button>
+          <button class="quick-btn" onclick="setConstPreset('idiom5')">Liberal democracy</button>
+          <button class="quick-btn" onclick="setConstPreset('idiom6')">Artificial intelligence</button>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div id="constResults" class="results-area hidden">
+
+        <!-- Metric pills row -->
+        <div class="metrics-row" id="constMetrics"></div>
+
+        <!-- Interactive chart (Plotly) -->
+        <div class="card chart-card large" style="padding:8px">
+          <div class="card-title">
+            📈 Interactive Drift Timelines — hover words, zoom in, click legend to toggle
+            <span style="font-size:.72rem;color:var(--text-muted);font-weight:400">
+              Bold white line = sentence drift · Thin lines = individual words
+            </span>
+          </div>
+          <div id="constellationPlot" style="width:100%;height:520px;"></div>
+        </div>
+
+        <!-- Correlation heatmap -->
+        <div class="card chart-card large">
+          <div class="card-title">🔗 Word-Pair Correlation Shift
+            <span style="font-size:.72rem;color:var(--text-muted);font-weight:400">
+              Green = words grew closer · Red = words drifted apart
+            </span>
+          </div>
+          <div class="chart-wrapper" id="constCorrChart">
+            <div class="chart-loading">Generating…</div>
+          </div>
+        </div>
+
+        <!-- Stability rank table -->
+        <div class="card">
+          <div class="card-title">🏅 Word Stability Rank
+            <span style="font-size:.72rem;color:var(--text-muted);font-weight:400">
+              sorted by peak drift score across all decades
+            </span>
+          </div>
+          <div id="constRankTable"></div>
+        </div>
+
+        <!-- Static combined chart (for export) -->
+        <div class="card chart-card large">
+          <div class="card-title">📄 Full Report Chart
+            <button class="btn-secondary" onclick="downloadConstellationChart()" style="float:right;margin-top:-4px">
+              ⬇ Save PNG
+            </button>
+          </div>
+          <div class="chart-wrapper" id="constStaticChart">
+            <div class="chart-loading">Generating…</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+
+  <!-- ══ LOADING OVERLAY ═══════════════════════════════════════════════════════ -->
+  <div class="overlay hidden" id="overlay">
+    <div class="overlay-card">
+      <div class="spinner"></div>
+      <p id="overlayMsg">Processing…</p>
+    </div>
+  </div>
+
+  <!-- ══ TOAST ═════════════════════════════════════════════════════════════════ -->
+  <div class="toast hidden" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>

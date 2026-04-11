@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Semantic Drift Report — Top-K Discovery Paradigm</title>
+  <meta name="description" content="Sentence-level semantic drift analysis extending Lee et al. EMNLP 2025 — discover which words drive meaning change across historical decades." />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Design System ────────────────────────────────────────────────────── */
+    :root {
+      --bg:       #06060f;
+      --bg2:      #0d0d1f;
+      --bg3:      #12122a;
+      --surface:  rgba(255,255,255,0.03);
+      --surface2: rgba(255,255,255,0.06);
+      --border:   rgba(255,255,255,0.08);
+      --border2:  rgba(255,255,255,0.14);
+      --accent:   #a855f7;
+      --gold:     #facc15;
+      --red:      #ef4444;
+      --green:    #22c55e;
+      --blue:     #3b82f6;
+      --orange:   #f97316;
+      --cyan:     #06b6d4;
+      --text:     #f0f0ff;
+      --muted:    #8888aa;
+      --dim:      #4a4a6a;
+      --font:     'Inter', system-ui, sans-serif;
+      --serif:    'Playfair Display', Georgia, serif;
+      --mono:     'JetBrains Mono', monospace;
+      --radius:   12px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.65;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background:
+        radial-gradient(ellipse at 15% 10%, rgba(168,85,247,0.10) 0%, transparent 50%),
+        radial-gradient(ellipse at 85% 90%, rgba(59,130,246,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(250,204,21,0.03) 0%, transparent 60%);
+    }
+
+    /* ── Layout ───────────────────────────────────────────────────────────── */
+    .page { max-width: 980px; margin: 0 auto; padding: 28px 20px 80px; position: relative; z-index: 1; }
+
+    /* ── Masthead ─────────────────────────────────────────────────────────── */
+    .masthead {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 22px;
+      margin-bottom: 28px;
+    }
+    .masthead-top {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; flex-wrap: wrap; gap: 12px;
+    }
+    .back-link {
+      font-size: 0.8rem; color: var(--muted); text-decoration: none;
+      display: flex; align-items: center; gap: 5px;
+      transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--accent); }
+    .paper-ref {
+      font-size: 0.72rem; color: var(--dim); font-style: italic;
+      background: rgba(168,85,247,0.06);
+      border: 1px solid rgba(168,85,247,0.15);
+      border-radius: 6px; padding: 4px 10px;
+    }
+    .page-title {
+      font-family: var(--serif);
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(120deg, #ffffff, var(--accent));
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.2;
+      margin: 14px 0 6px;
+    }
+    .page-subtitle {
+      font-size: 0.88rem; color: var(--muted); max-width: 640px;
+    }
+
+    /* ── Input Form ───────────────────────────────────────────────────────── */
+    .form-card {
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      margin-bottom: 28px;
+    }
+    .form-title {
+      font-size: 0.75rem; font-weight: 700;
+      color: var(--accent); text-transform: uppercase;
+      letter-spacing: 0.8px; margin-bottom: 14px;
+    }
+    textarea, select, input[type="number"] {
+      width: 100%;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.88rem;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    textarea:focus, select:focus, input[type="number"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(168,85,247,0.12);
+    }
+    textarea { resize: vertical; min-height: 90px; }
+    select option { background: var(--bg2); }
+
+    .form-row {
+      display: flex; gap: 12px; flex-wrap: wrap;
+      align-items: flex-end; margin-top: 12px;
+    }
+    .form-field { display: flex; flex-direction: column; gap: 5px; }
+    .form-label {
+      font-size: 0.72rem; font-weight: 600;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .narrow { flex: 0 0 120px; }
+    .wide   { flex: 1; min-width: 220px; }
+
+    .btn {
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      border: none; border-radius: 8px;
+      color: #fff; cursor: pointer;
+      font-family: var(--font);
+      font-size: 0.88rem; font-weight: 600;
+      padding: 11px 24px;
+      transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+      display: flex; align-items: center; gap: 8px; white-space: nowrap;
+    }
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 20px rgba(168,85,247,0.4); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    .preset-row { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+    .preset-label { font-size: 0.72rem; color: var(--dim); font-weight: 600; }
+    .preset-btn {
+      background: rgba(168,85,247,0.07);
+      border: 1px solid rgba(168,85,247,0.2);
+      border-radius: 16px; color: var(--accent);
+      cursor: pointer; font-family: var(--mono); font-size: 0.75rem;
+      padding: 3px 12px; transition: all 0.18s;
+    }
+    .preset-btn:hover { background: rgba(168,85,247,0.18); border-color: var(--accent); }
+
+    /* ── Status / Error ───────────────────────────────────────────────────── */
+    .status-bar {
+      padding: 12px 18px; border-radius: 8px; font-size: 0.85rem;
+      display: none; margin-bottom: 20px;
+    }
+    .status-bar.loading { background: rgba(168,85,247,0.1); border: 1px solid rgba(168,85,247,0.25); color: var(--accent); display: flex; align-items: center; gap: 10px; }
+    .status-bar.error   { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #f87171; display: block; }
+    .spinner-sm { width:16px; height:16px; border:2px solid rgba(168,85,247,0.3); border-top-color:var(--accent); border-radius:50%; animation: spin 0.7s linear infinite; flex-shrink:0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Report Sections ──────────────────────────────────────────────────── */
+    #report { display: none; }
+
+    .section { margin-bottom: 32px; }
+    .section-label {
+      font-size: 0.7rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 1px;
+      margin-bottom: 14px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-label::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    /* Executive Summary */
+    .summary-card {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 22px 26px;
+      position: relative;
+    }
+    .summary-card::before {
+      content: '';
+      position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+      background: linear-gradient(180deg, var(--accent), var(--blue));
+      border-radius: var(--radius) 0 0 var(--radius);
+    }
+    .drift-headline {
+      display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .drift-score-big {
+      font-family: var(--mono); font-size: 2.4rem; font-weight: 700; line-height:1;
+    }
+    .change-class-badge {
+      font-size: 0.8rem; font-weight: 700; padding: 4px 14px;
+      border-radius: 20px; font-family: var(--mono);
+    }
+    .badge-major    { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+    .badge-moderate { background: rgba(249,115,22,0.15); color: #fb923c; border: 1px solid rgba(249,115,22,0.3); }
+    .badge-mild     { background: rgba(250,204,21,0.12); color: var(--gold); border: 1px solid rgba(250,204,21,0.25); }
+    .badge-stable   { background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
+
+    .era-interpretations {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+      margin-top: 16px;
+    }
+    @media (max-width: 600px) { .era-interpretations { grid-template-columns: 1fr; } }
+
+    .era-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 16px;
+    }
+    .era-box-label {
+      font-size: 0.68rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      margin-bottom: 6px;
+    }
+    .era-box-text { font-size: 0.84rem; color: var(--muted); line-height: 1.6; }
+
+    /* Metrics row */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px; margin-bottom: 24px;
+    }
+    .metric {
+      background: var(--surface2); border: 1px solid var(--border2);
+      border-radius: var(--radius); padding: 14px 16px; text-align: center;
+    }
+    .metric-label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+    .metric-value { font-family: var(--mono); font-size: 1.6rem; font-weight: 800; line-height: 1; }
+    .metric-sub   { font-size: 0.7rem; color: var(--dim); margin-top: 3px; }
+    .v-red     { color: var(--red); }
+    .v-green   { color: var(--green); }
+    .v-gold    { color: var(--gold); }
+    .v-accent  { color: var(--accent); }
+    .v-blue    { color: var(--blue); }
+
+    /* Top-K Discovery Ranking */
+    .topk-table { width: 100%; border-collapse: collapse; }
+    .topk-table th {
+      text-align: left; padding: 8px 12px;
+      font-size: 0.68rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+    .topk-table td {
+      padding: 11px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      vertical-align: middle;
+    }
+    .topk-table tr:hover td { background: rgba(168,85,247,0.04); }
+    .topk-rank-num { font-family: var(--mono); color: var(--dim); width: 32px; }
+    .topk-word { font-family: var(--mono); font-weight: 700; font-size: 1rem; }
+    .topk-drift, .topk-contrib { font-family: var(--mono); font-size: 0.82rem; }
+    .topk-label-badge {
+      font-size: 0.65rem; font-weight: 700;
+      padding: 2px 8px; border-radius: 10px;
+    }
+    .topk-bar-cell { width: 180px; }
+    .topk-bar-bg   { background: rgba(255,255,255,0.06); border-radius: 4px; height:7px; overflow:hidden; }
+    .topk-bar-fill { height: 100%; border-radius: 4px; transition: width 0.8s ease; }
+
+    /* Word Reasoning Cards */
+    .word-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+      gap: 16px;
+    }
+    @media (max-width: 500px) { .word-cards-grid { grid-template-columns: 1fr; } }
+
+    .word-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .word-card:hover { border-color: var(--border2); box-shadow: 0 0 24px rgba(168,85,247,0.1); }
+
+    .word-card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; cursor: pointer;
+      background: rgba(255,255,255,0.02);
+      border-bottom: 1px solid var(--border);
+    }
+    .word-card-header:hover { background: rgba(255,255,255,0.04); }
+    .word-card-title { display: flex; align-items: center; gap: 12px; }
+    .wc-rank { font-family: var(--mono); font-size: 0.7rem; color: var(--dim); }
+    .wc-word { font-family: var(--mono); font-size: 1.25rem; font-weight: 700; }
+    .wc-label {
+      font-size: 0.65rem; font-weight: 700;
+      padding: 3px 9px; border-radius: 10px;
+    }
+    .wc-scores { display: flex; gap: 16px; font-size: 0.78rem; }
+    .wc-score-item { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+    .wc-score-label { font-size: 0.62rem; color: var(--dim); text-transform: uppercase; }
+    .wc-score-val   { font-family: var(--mono); font-weight: 700; }
+    .expand-icon { color: var(--dim); font-size: 0.8rem; transition: transform 0.2s; }
+    .word-card.open .expand-icon { transform: rotate(180deg); }
+
+    .word-card-body { display: none; padding: 16px 18px; }
+    .word-card.open .word-card-body { display: block; animation: fadeIn 0.25s ease; }
+
+    /* Domain transition row */
+    .domain-transition {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--surface2);
+      border-radius: 8px; padding: 10px 14px;
+      margin-bottom: 12px; flex-wrap: wrap;
+    }
+    .domain-chip {
+      font-size: 0.72rem; font-weight: 600; padding: 3px 10px;
+      border-radius: 10px;
+    }
+    .domain-chip.a { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.25); }
+    .domain-chip.b { background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.25); }
+    .domain-arrow  { color: var(--dim); font-size: 1rem; }
+
+    /* Neighbor comparison */
+    .nbr-compare {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+      margin-bottom: 12px;
+    }
+    @media (max-width: 500px) { .nbr-compare { grid-template-columns: 1fr; } }
+    .nbr-col-title {
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; margin-bottom: 7px;
+    }
+    .nbr-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+    .nbr-tag {
+      font-family: var(--mono); font-size: 0.72rem;
+      padding: 2px 8px; border-radius: 6px;
+    }
+    .nbr-tag.shared { background: rgba(168,85,247,0.12); color: #c084fc; }
+    .nbr-tag.old    { background: rgba(59,130,246,0.12); color: #60a5fa; }
+    .nbr-tag.new    { background: rgba(34,197,94,0.10); color: #4ade80; }
+    .nbr-tag.lost   { background: rgba(239,68,68,0.10); color: #f87171; text-decoration: line-through; }
+
+    /* Reasoning block */
+    .reasoning-block {
+      background: rgba(168,85,247,0.05);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      padding: 12px 14px; margin-bottom: 10px;
+    }
+    .reasoning-title {
+      font-size: 0.68rem; font-weight: 700; color: var(--accent);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px;
+    }
+    .reasoning-text  { font-size: 0.85rem; color: var(--text); line-height: 1.65; }
+    .evidence-text   { font-size: 0.8rem; color: var(--muted); line-height: 1.6; }
+
+    /* Contribution bar inside card */
+    .contrib-row {
+      display: flex; gap: 10px; align-items: center; margin-top: 12px;
+      font-size: 0.78rem;
+    }
+    .contrib-label { color: var(--muted); white-space: nowrap; }
+    .contrib-bar-bg { flex: 1; background: rgba(255,255,255,0.06); border-radius: 4px; height: 8px; overflow: hidden; }
+    .contrib-bar-fill { height: 100%; border-radius: 4px; }
+    .contrib-pct { font-family: var(--mono); font-size: 0.75rem; color: var(--gold); white-space: nowrap; }
+
+    /* Anchors */
+    .anchor-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .anchor-chip {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(34,197,94,0.07);
+      border: 1px solid rgba(34,197,94,0.2);
+      border-radius: 20px; padding: 5px 12px;
+      font-family: var(--mono); font-size: 0.8rem;
+    }
+    .anchor-word  { color: #4ade80; font-weight: 700; }
+    .anchor-score { color: var(--dim); font-size: 0.7rem; }
+
+    /* Domain transitions summary */
+    .transition-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .transition-table td { padding: 9px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .transition-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* Footer */
+    .footer {
+      margin-top: 48px; padding-top: 20px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 0.75rem; color: var(--dim); line-height: 1.8;
+    }
+    .footer a { color: var(--accent); text-decoration: none; }
+
+    @keyframes fadeIn { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: none; } }
+    .animate-in { animation: fadeIn 0.4s ease; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── Masthead ──────────────────────────────────────────────────────── -->
+  <div class="masthead">
+    <div class="masthead-top">
+      <a href="index.html" class="back-link">← Dashboard</a>
+      <span class="paper-ref">Extends Lee et al. EMNLP 2025 · Top-K Semantic Change Discovery</span>
+    </div>
+    <h1 class="page-title">Semantic Drift Report Generator</h1>
+    <p class="page-subtitle">
+      Discovers <em>which words drive</em> a sentence's meaning change across historical decades —
+      extending the <strong>Top-K Discovery Paradigm</strong> from single words to full sentences
+      using counterfactual contribution scoring and domain transition analysis.
+    </p>
+  </div>
+
+  <!-- ── Input Form ────────────────────────────────────────────────────── -->
+  <div class="form-card">
+    <div class="form-title">📝 Input — Sentence, Idiom, or Phrase</div>
+    <textarea id="sentInput" rows="3"
+      placeholder="e.g. The artificial broadcast of information across social networks has transformed the computer virus landscape."></textarea>
+
+    <div class="form-row">
+      <div class="form-field narrow">
+        <label class="form-label" for="yearA">From Decade</label>
+        <select id="yearA"></select>
+      </div>
+      <div class="form-field narrow">
+        <label class="form-label" for="yearB">To Decade</label>
+        <select id="yearB"></select>
+      </div>
+      <div class="form-field narrow">
+        <label class="form-label" for="topK">Top-K</label>
+        <input type="number" id="topK" value="5" min="2" max="15" />
+      </div>
+      <button class="btn" id="runBtn" onclick="runReport()">
+        <span>⚗</span> Generate Report
+      </button>
+    </div>
+
+    <div class="preset-row">
+      <span class="preset-label">Sample phrases:</span>
+      <button class="preset-btn" onclick="setPreset('tech')">AI Networks</button>
+      <button class="preset-btn" onclick="setPreset('broadcast')">Broadcast &amp; Media</button>
+      <button class="preset-btn" onclick="setPreset('liberal')">Liberal Democracy</button>
+      <button class="preset-btn" onclick="setPreset('virus')">Viral Spread</button>
+      <button class="preset-btn" onclick="setPreset('selection')">Natural Selection</button>
+      <button class="preset-btn" onclick="setPreset('industrial')">Industrial Power</button>
+    </div>
+  </div>
+
+  <!-- ── Status bar ────────────────────────────────────────────────────── -->
+  <div class="status-bar" id="statusBar"></div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       REPORT OUTPUT
+  ══════════════════════════════════════════════════════════════════════ -->
+  <div id="report">
+
+    <!-- 1. Executive Summary ─────────────────────────────────────────── -->
+    <div class="section">
+      <div class="section-label">1 · Executive Summary</div>
+      <div class="summary-card">
+        <div class="drift-headline">
+          <div class="drift-score-big" id="sumDriftScore"></div>
+          <div class="change-class-badge" id="sumChangeClass"></div>
+        </div>
+        <div id="sumSentence" style="font-size:0.9rem;color:var(--muted);margin-bottom:14px;font-family:var(--mono);padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:6px;border-left:2px solid var(--accent)"></div>
+        <div id="sumTopDriver" style="font-size:0.85rem;margin-bottom:12px"></div>
+        <div class="era-interpretations" id="eraInterpretations"></div>
+      </div>
+    </div>
+
+    <!-- 2. Metrics ───────────────────────────────────────────────────── -->
+    <div class="section">
+      <div class="section-label">2 · Quantitative Overview</div>
+      <div class="metrics-grid" id="metricsGrid"></div>
+    </div>
+
+    <!-- 3. Top-K Discovery Ranking ───────────────────────────────────── -->
+    <div class="section">
+      <div class="section-label">3 · Top-K Discovery Ranking  <span style="color:var(--accent);font-style:italic;text-transform:none;font-size:0.72rem">words ranked by counterfactual contribution to sentence drift</span></div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);overflow:hidden">
+        <div style="padding:10px 14px;font-size:0.78rem;color:var(--muted);border-bottom:1px solid var(--border)">
+          <strong style="color:var(--gold)">Contribution Score</strong> = how much sentence drift <em>drops</em> if this word's embedding had stayed frozen (counterfactual). A high contribution means this word is the primary driver of the sentence's meaning shift.
+        </div>
+        <div style="overflow-x:auto">
+          <table class="topk-table" id="topkTable"></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Per-Word Reasoning Cards ──────────────────────────────────── -->
+    <div class="section">
+      <div class="section-label">4 · Per-Word Reasoning  <span style="color:var(--accent);font-style:italic;text-transform:none;font-size:0.72rem">discovery annotation for top-K drivers</span></div>
+      <div class="word-cards-grid" id="wordCardsGrid"></div>
+    </div>
+
+    <!-- 5. Stable Anchor Words ───────────────────────────────────────── -->
+    <div class="section">
+      <div class="section-label">5 · Stable Anchor Words  <span style="color:var(--green);font-style:italic;text-transform:none;font-size:0.72rem">words that held the sentence's meaning together</span></div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px">
+        <p style="font-size:0.82rem;color:var(--muted);margin-bottom:14px">
+          Anchor words are content words whose individual drift AND counterfactual contribution are both low — they serve as semantic constants that gave the sentence continuity across the eras studied.
+        </p>
+        <div class="anchor-chips" id="anchorChips"></div>
+      </div>
+    </div>
+
+    <!-- 6. Domain Transition Map ─────────────────────────────────────── -->
+    <div class="section">
+      <div class="section-label">6 · Domain Transition Map</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px">
+        <p style="font-size:0.82rem;color:var(--muted);margin-bottom:14px">
+          Summary of which semantic domains the sentence's vocabulary migrated between. Based on nearest-neighbor lexical overlap with 10 curated domain seed sets.
+        </p>
+        <div id="domainTransitionMap"></div>
+      </div>
+    </div>
+
+  </div><!-- /report -->
+
+  <!-- ── Footer ───────────────────────────────────────────────────────── -->
+  <div class="footer">
+    <strong>Semantic Drift Analysis</strong> · B.Tech NLP Major Project<br />
+    Sentence-level extension of
+    <em>Lee et al., "Evaluating Semantic-Change Discovery: A Top-K Paradigm for Contextualized Representations"</em>,
+    EMNLP 2025<br />
+    Dataset: <a href="https://nlp.stanford.edu/projects/historicalWordVectors/" target="_blank">Stanford/Google Ngram SGNS Embeddings (1800–1990)</a>
+  </div>
+</div><!-- /page -->
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// Configuration
+// ══════════════════════════════════════════════════════════════════════════════
+
+const API = "http://localhost:5000/api";
+let DECADES = [];
+
+const PRESETS = {
+  tech:        "The artificial intelligence network has transformed the computer broadcast of scientific information.",
+  broadcast:   "The broadcast of information across social networks transformed public knowledge and collective culture.",
+  liberal:     "Liberal democracy spread through the broadcast of enlightened reason and political freedom.",
+  virus:       "The virus spreads artificially through computer networks and biological broadcast channels.",
+  selection:   "Natural selection drives the artificial evolution of social groups and political organisms.",
+  industrial:  "The mechanical power of industrial networks transformed the social and economic fabric of society.",
+};
+
+function setPreset(key) {
+  document.getElementById("sentInput").value = PRESETS[key] || "";
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Initialise — load decades from health check
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function init() {
+  try {
+    const res  = await fetch(`${API}/health`);
+    const data = await res.json();
+    DECADES = data.available_decades || [];
+    populateSelects();
+  } catch (e) {
+    showError("Backend offline — run app.py first, then refresh this page.");
+  }
+}
+
+function populateSelects() {
+  ["yearA","yearB"].forEach(id => {
+    const el = document.getElementById(id);
+    el.innerHTML = "";
+    DECADES.forEach(yr => {
+      const opt = document.createElement("option");
+      opt.value = yr; opt.textContent = yr;
+      el.appendChild(opt);
+    });
+  });
+  if (DECADES.length >= 2) {
+    document.getElementById("yearA").value = 1900;
+    document.getElementById("yearB").value = 1990;
+  }
+}
+
+init();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Run Report
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function runReport() {
+  const text  = document.getElementById("sentInput").value.trim();
+  const yearA = parseInt(document.getElementById("yearA").value);
+  const yearB = parseInt(document.getElementById("yearB").value);
+  const topK  = parseInt(document.getElementById("topK").value) || 5;
+
+  if (!text)        return showError("Please enter a sentence.");
+  if (yearA >= yearB) return showError("'From decade' must be before 'To decade'.");
+
+  const btn = document.getElementById("runBtn");
+  btn.disabled = true;
+  document.getElementById("report").style.display = "none";
+  showLoading("Generating discovery report — loading embeddings for both eras…");
+
+  try {
+    const res = await fetch(`${API}/drift-report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, year_a: yearA, year_b: yearB, top_k: topK }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || "Server error");
+
+    hideStatus();
+    renderReport(data);
+    document.getElementById("report").style.display = "block";
+    document.getElementById("report").classList.add("animate-in");
+    document.getElementById("report").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Render
+// ══════════════════════════════════════════════════════════════════════════════
+
+const LABEL_COLOURS = {
+  "Metaphorical Extension": ["rgba(168,85,247,0.15)", "#c084fc"],
+  "Domain Migration":       ["rgba(59,130,246,0.15)", "#60a5fa"],
+  "Broadening":             ["rgba(34,197,94,0.12)",  "#4ade80"],
+  "Narrowing":              ["rgba(239,68,68,0.12)",  "#f87171"],
+  "Register Shift":         ["rgba(250,204,21,0.12)", "#fde047"],
+  "Semantic Narrowing":     ["rgba(249,115,22,0.12)", "#fb923c"],
+};
+function labelStyle(label) {
+  const [bg, color] = LABEL_COLOURS[label] || ["rgba(255,255,255,0.08)", "#aaa"];
+  return `background:${bg};color:${color};border:1px solid ${color}33`;
+}
+
+function driftColor(d) {
+  return d > 0.4 ? "#ef4444" : d > 0.25 ? "#f97316" : d > 0.12 ? "#facc15" : "#22c55e";
+}
+
+function renderReport(r) {
+  // ── 1. Executive Summary ────────────────────────────────────────────────
+  const scoreEl = document.getElementById("sumDriftScore");
+  scoreEl.textContent = r.sentence_drift.toFixed(3);
+  scoreEl.style.color = driftColor(r.sentence_drift);
+
+  const classEl = document.getElementById("sumChangeClass");
+  classEl.textContent = r.sentence_change_class;
+  const classMap = {
+    "Major Semantic Shift":     "badge-major",
+    "Moderate Semantic Drift":  "badge-moderate",
+    "Mild Semantic Drift":      "badge-mild",
+    "Semantically Stable":      "badge-stable",
+  };
+  classEl.className = `change-class-badge ${classMap[r.sentence_change_class] || ""}`;
+
+  document.getElementById("sumSentence").textContent =
+    `"${r.text}"  ·  ${r.year_a} → ${r.year_b}`;
+
+  const topDriver = r.discovery_rank[0] || {};
+  document.getElementById("sumTopDriver").innerHTML = topDriver.word ? `
+    Primary semantic driver: <strong style="color:var(--accent);font-family:var(--mono)">${topDriver.word}</strong>
+    <span style="color:var(--muted)">(${topDriver.label} · drift ${topDriver.drift.toFixed(3)} · contribution ${topDriver.contribution_pct.toFixed(1)}% of sentence shift)</span>
+  ` : "";
+
+  document.getElementById("eraInterpretations").innerHTML = `
+    <div class="era-box">
+      <div class="era-box-label" style="color:#60a5fa">📖 Era A — ${r.year_a}</div>
+      <div class="era-box-text">${r.interpretation_a}</div>
+    </div>
+    <div class="era-box">
+      <div class="era-box-label" style="color:#c084fc">📖 Era B — ${r.year_b}</div>
+      <div class="era-box-text">${r.interpretation_b}</div>
+    </div>
+  `;
+
+  // ── 2. Metrics ───────────────────────────────────────────────────────────
+  document.getElementById("metricsGrid").innerHTML = `
+    <div class="metric">
+      <div class="metric-label">Sentence Drift</div>
+      <div class="metric-value ${r.sentence_drift > 0.4 ? 'v-red' : r.sentence_drift > 0.2 ? 'v-gold' : 'v-green'}">${r.sentence_drift.toFixed(3)}</div>
+      <div class="metric-sub">cosine distance</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Words Analysed</div>
+      <div class="metric-value v-accent">${r.found_words.length}</div>
+      <div class="metric-sub">of ${r.content_words.length} content words</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">High-Drift Words</div>
+      <div class="metric-value v-red">${r.n_high_drift}</div>
+      <div class="metric-sub">drift > 0.35</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Stable Words</div>
+      <div class="metric-value v-green">${r.n_stable}</div>
+      <div class="metric-sub">drift ≤ 0.15</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Not Found</div>
+      <div class="metric-value" style="color:var(--dim)">${r.not_found.length}</div>
+      <div class="metric-sub">${r.not_found.join(", ") || "none"}</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Domain Shifts</div>
+      <div class="metric-value v-blue">${Object.keys(r.domain_transitions).length}</div>
+      <div class="metric-sub">unique A→B domains</div>
+    </div>
+  `;
+
+  // ── 3. Top-K Ranking ─────────────────────────────────────────────────────
+  const maxContrib = Math.max(...r.discovery_rank.map(w => Math.abs(w.contribution)));
+  const rows = r.discovery_rank.map((w, i) => {
+    const contribW = maxContrib > 0 ? Math.abs(w.contribution) / maxContrib * 100 : 0;
+    const barColor = driftColor(w.drift);
+    const ls = labelStyle(w.label);
+    return `<tr>
+      <td class="topk-rank-num">#${i+1}</td>
+      <td class="topk-word" style="color:${driftColor(w.drift)}">${w.word}</td>
+      <td class="topk-drift" style="color:${driftColor(w.drift)}">${w.drift.toFixed(4)}</td>
+      <td class="topk-drift" style="color:${w.contribution >= 0 ? '#facc15' : '#22c55e'}">
+        ${w.contribution >= 0 ? '+' : ''}${w.contribution.toFixed(4)}
+        <span style="font-size:.68rem;color:var(--dim)">(${w.contribution_pct.toFixed(1)}%)</span>
+      </td>
+      <td><span class="topk-label-badge" style="${ls}">${w.label}</span></td>
+      <td style="font-size:.72rem;color:var(--muted)">${w.domain_a} → ${w.domain_b}</td>
+      <td class="topk-bar-cell">
+        <div class="topk-bar-bg">
+          <div class="topk-bar-fill" style="width:${contribW.toFixed(1)}%;background:${barColor}"></div>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+  document.getElementById("topkTable").innerHTML = `
+    <thead><tr>
+      <th>#</th><th>Word</th><th>Drift</th><th>Contribution</th>
+      <th>Change Type</th><th>Domain Shift</th><th>Contrib Bar</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>`;
+
+  // ── 4. Per-Word Reasoning Cards ───────────────────────────────────────
+  const topWords  = r.discovery_rank; // all ranked, show top-k+2 max
+  const grid = document.getElementById("wordCardsGrid");
+  grid.innerHTML = topWords.map((w, i) => buildWordCard(w, i)).join("");
+
+  // Register toggle clicks
+  grid.querySelectorAll(".word-card-header").forEach(h => {
+    h.addEventListener("click", () => {
+      h.parentElement.classList.toggle("open");
+    });
+  });
+  // Open first card by default
+  const first = grid.querySelector(".word-card");
+  if (first) first.classList.add("open");
+
+  // ── 5. Anchors ────────────────────────────────────────────────────────
+  document.getElementById("anchorChips").innerHTML =
+    r.anchors.map(a => `
+      <div class="anchor-chip">
+        <span class="anchor-word">${a.word}</span>
+        <span class="anchor-score">drift: ${a.drift.toFixed(3)}</span>
+      </div>`).join("");
+
+  // ── 6. Domain Transitions ─────────────────────────────────────────────
+  const trans = r.domain_transitions;
+  if (Object.keys(trans).length === 0) {
+    document.getElementById("domainTransitionMap").innerHTML =
+      `<p style="color:var(--dim);font-size:.85rem">No significant domain transitions detected — the sentence vocabulary stayed within the same semantic domains across the eras.</p>`;
+  } else {
+    const rows = Object.entries(trans)
+      .sort((a,b) => b[1]-a[1])
+      .map(([key, count]) => {
+        const [da, db] = key.split(" → ");
+        return `<tr>
+          <td><span class="domain-chip a">${da}</span></td>
+          <td style="color:var(--dim);font-size:1.1rem;text-align:center">→</td>
+          <td><span class="domain-chip b">${db}</span></td>
+          <td style="font-family:var(--mono);color:var(--gold);text-align:right">${count} word${count>1?'s':''}</td>
+        </tr>`;
+      }).join("");
+    document.getElementById("domainTransitionMap").innerHTML = `
+      <table class="transition-table">
+        <thead><tr>
+          <th>Domain in ${r.year_a}</th><th></th>
+          <th>Domain in ${r.year_b}</th><th style="text-align:right">Words</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+}
+
+// ── Word Card Builder ──────────────────────────────────────────────────────
+
+function buildWordCard(w, i) {
+  const ls = labelStyle(w.label);
+  const dc = driftColor(w.drift);
+  const maxContrib = 1; // relative bar within card
+  const barPct = Math.min(Math.abs(w.contribution_pct), 100);
+  const barColor = w.contribution >= 0 ? "#facc15" : "#22c55e";
+
+  // neighbor tags
+  const sharedSet = new Set(w.shared);
+  const gainedSet = new Set(w.gained);
+  const lostSet   = new Set(w.lost);
+
+  function tags(words, classify) {
+    return words.map(word => {
+      let cls = "old";
+      if (classify === "b") {
+        cls = gainedSet.has(word) ? "new" : sharedSet.has(word) ? "shared" : "old";
+      } else {
+        cls = lostSet.has(word) ? "lost" : sharedSet.has(word) ? "shared" : "old";
+      }
+      return `<span class="nbr-tag ${cls}">${word}</span>`;
+    }).join("");
+  }
+
+  return `
+  <div class="word-card" id="wcard-${i}">
+    <div class="word-card-header">
+      <div class="word-card-title">
+        <span class="wc-rank">#${i+1}</span>
+        <span class="wc-word" style="color:${dc}">${w.word}</span>
+        <span class="wc-label" style="${ls}">${w.label}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div class="wc-scores">
+          <div class="wc-score-item">
+            <span class="wc-score-label">Drift</span>
+            <span class="wc-score-val" style="color:${dc}">${w.drift.toFixed(4)}</span>
+          </div>
+          <div class="wc-score-item">
+            <span class="wc-score-label">Contrib</span>
+            <span class="wc-score-val" style="color:${barColor}">${w.contribution_pct.toFixed(1)}%</span>
+          </div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+    </div>
+
+    <div class="word-card-body">
+      <!-- Domain transition -->
+      <div class="domain-transition">
+        <span class="domain-chip a">${w.domain_a}</span>
+        <span class="domain-arrow">→</span>
+        <span class="domain-chip b">${w.domain_b}</span>
+        <span style="font-size:.72rem;color:var(--dim);margin-left:auto">domain confidence: ${w.domain_conf_a.toFixed(2)} / ${w.domain_conf_b.toFixed(2)}</span>
+      </div>
+
+      <!-- Neighbour compare -->
+      <div class="nbr-compare">
+        <div>
+          <div class="nbr-col-title" style="color:#60a5fa">Neighbours in ${window._curYearA || 'Era A'}</div>
+          <div class="nbr-tags">${tags(w.neighbors_a, 'a')}</div>
+        </div>
+        <div>
+          <div class="nbr-col-title" style="color:#c084fc">Neighbours in ${window._curYearB || 'Era B'}</div>
+          <div class="nbr-tags">${tags(w.neighbors_b, 'b')}</div>
+        </div>
+      </div>
+
+      <!-- Reasoning -->
+      <div class="reasoning-block">
+        <div class="reasoning-title">💡 Linguistic Reasoning</div>
+        <div class="reasoning-text">${w.reasoning}</div>
+      </div>
+      <div class="evidence-text">📜 <em>${w.evidence}</em></div>
+
+      <!-- Contribution bar -->
+      <div class="contrib-row">
+        <span class="contrib-label">Sentence drift contribution:</span>
+        <div class="contrib-bar-bg">
+          <div class="contrib-bar-fill" style="width:${barPct.toFixed(1)}%;background:${barColor}"></div>
+        </div>
+        <span class="contrib-pct">${w.contribution_pct.toFixed(1)}%</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Status helpers ─────────────────────────────────────────────────────────
+
+function showLoading(msg) {
+  const el = document.getElementById("statusBar");
+  el.className = "status-bar loading";
+  el.innerHTML = `<div class="spinner-sm"></div><span>${msg}</span>`;
+}
+function showError(msg) {
+  const el = document.getElementById("statusBar");
+  el.className = "status-bar error";
+  el.textContent = "⚠ " + msg;
+}
+function hideStatus() {
+  const el = document.getElementById("statusBar");
+  el.style.display = "none";
+  el.className = "status-bar";
+}
+
+// Store years for card display
+document.getElementById("runBtn").addEventListener("click", () => {
+  window._curYearA = document.getElementById("yearA").value;
+  window._curYearB = document.getElementById("yearB").value;
+}, true);
+</script>
+</body>
+</html>

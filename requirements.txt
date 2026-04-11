@@ -1,0 +1,18 @@
+# Semantic Drift Analysis — Python Dependencies
+# Install inside venv: pip install -r requirements.txt
+
+numpy>=2.0
+scipy>=1.10
+matplotlib>=3.8
+scikit-learn>=1.3
+pandas>=2.0
+tqdm>=4.65
+flask>=3.0
+flask-cors>=4.0
+seaborn>=0.13
+plotly>=5.18
+wordcloud>=1.9
+nltk>=3.8
+requests>=2.31
+setuptools>=68.0
+wheel>=0.41
