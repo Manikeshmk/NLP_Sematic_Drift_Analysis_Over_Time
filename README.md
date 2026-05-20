@@ -1,3 +1,7 @@
+![Repo visits](https://hits.sh/github.com/Manikeshmk/NLP_Sematic_Drift_Analysis_Over_Time.svg?label=repo%20visits)
+![GitHub stars](https://img.shields.io/github/stars/Manikeshmk/NLP_Sematic_Drift_Analysis_Over_Time?style=logo&logo=github&label=⭐%20Stars) 
+![GitHub forks](https://img.shields.io/github/forks/Manikeshmk/NLP_Sematic_Drift_Analysis_Over_Time?style=social)
+
 # ⚗ Semantic Drift Analysis Over Time
 ### B.Tech Major Project — Natural Language Processing
 
