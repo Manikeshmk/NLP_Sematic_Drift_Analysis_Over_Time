@@ -10,6 +10,18 @@ let loadedDecades = [];
 
 document.addEventListener("DOMContentLoaded", async () => {
   initTabs();
+  // Check if on GitHub Pages or local
+  if (
+    window.location.hostname !== "localhost" &&
+    !window.location.hostname.startsWith("127.")
+  ) {
+    // Show banner for remote deployments
+    const banner = document.getElementById("offlineBanner");
+    if (banner) {
+      banner.classList.remove("hidden");
+      document.body.classList.add("banner-visible");
+    }
+  }
   await checkHealth();
   loadCaseStudies();
 });
@@ -37,18 +49,32 @@ async function checkHealth() {
   } catch (e) {
     const dot = document.getElementById("statusDot");
     dot.className = "status-dot error";
-    document.getElementById("statusText").textContent = "API offline — run app.py";
+    document.getElementById("statusText").textContent =
+      "API offline — run app.py";
+
+    // Show offline warning banner
+    const banner = document.getElementById("offlineBanner");
+    if (banner) {
+      banner.classList.remove("hidden");
+      document.body.classList.add("banner-visible");
+    }
   }
 }
 
 function populateDecadeSelects() {
-  const selects = ["explorerYearA", "explorerYearB", "topYearA", "topYearB",
-                   "constYearA",   "constYearB"];
-  selects.forEach(id => {
+  const selects = [
+    "explorerYearA",
+    "explorerYearB",
+    "topYearA",
+    "topYearB",
+    "constYearA",
+    "constYearB",
+  ];
+  selects.forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.innerHTML = "";
-    loadedDecades.forEach(yr => {
+    loadedDecades.forEach((yr) => {
       const opt = document.createElement("option");
       opt.value = yr;
       opt.textContent = yr;
@@ -80,10 +106,14 @@ function populateDecadeSelects() {
 // ─── Tab Navigation ───────────────────────────────────────────────────────────
 
 function initTabs() {
-  document.querySelectorAll(".tab-btn").forEach(btn => {
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+      document
+        .querySelectorAll(".tab-btn")
+        .forEach((b) => b.classList.remove("active"));
+      document
+        .querySelectorAll(".tab-panel")
+        .forEach((p) => p.classList.remove("active"));
       btn.classList.add("active");
       const panel = document.getElementById(`tab-${btn.dataset.tab}`);
       if (panel) panel.classList.add("active");
@@ -113,7 +143,11 @@ function toast(msg, type = "") {
 
 async function api(path, body = null) {
   const opts = body
-    ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+    ? {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }
     : { method: "GET" };
   const res = await fetch(`${API}${path}`, opts);
   if (!res.ok) {
@@ -140,13 +174,15 @@ function quickWord(word) {
 // ══════════════════════════════════════════════════════════════════════════════
 
 const CONST_PRESETS = {
-  tech:   "The spread of artificial intelligence and computer networks transformed the broadcast of information.",
+  tech: "The spread of artificial intelligence and computer networks transformed the broadcast of information.",
   idiom1: "Break the ice with cold silence between warm hearts.",
   idiom2: "The viral broadcast spread like disease across the network.",
   idiom3: "The network of political power controls the liberal economy.",
   idiom4: "Natural selection drives the evolution of artificial species.",
-  idiom5: "Liberal democracy spread through the broadcast of enlightened reason.",
-  idiom6: "Artificial intelligence simulates the natural network of human thought.",
+  idiom5:
+    "Liberal democracy spread through the broadcast of enlightened reason.",
+  idiom6:
+    "Artificial intelligence simulates the natural network of human thought.",
 };
 
 function setConstPreset(key) {
@@ -155,27 +191,44 @@ function setConstPreset(key) {
 
 // Word colour palette (must match Python side)
 const CONST_PALETTE = [
-  "#a855f7","#3b82f6","#22c55e","#f97316","#ef4444",
-  "#facc15","#06b6d4","#ec4899","#84cc16","#8b5cf6",
-  "#14b8a6","#f43f5e","#fb923c","#a3e635","#38bdf8",
+  "#a855f7",
+  "#3b82f6",
+  "#22c55e",
+  "#f97316",
+  "#ef4444",
+  "#facc15",
+  "#06b6d4",
+  "#ec4899",
+  "#84cc16",
+  "#8b5cf6",
+  "#14b8a6",
+  "#f43f5e",
+  "#fb923c",
+  "#a3e635",
+  "#38bdf8",
 ];
 
-let _lastConstellationData = null;   // for PNG download
+let _lastConstellationData = null; // for PNG download
 
 async function runConstellation() {
-  const text  = document.getElementById("constInput").value.trim();
+  const text = document.getElementById("constInput").value.trim();
   const yearA = parseInt(document.getElementById("constYearA").value);
   const yearB = parseInt(document.getElementById("constYearB").value);
 
-  if (!text)          return toast("Enter a sentence or phrase first", "error");
-  if (yearA >= yearB) return toast("From decade must be before To decade", "error");
+  if (!text) return toast("Enter a sentence or phrase first", "error");
+  if (yearA >= yearB)
+    return toast("From decade must be before To decade", "error");
 
   const btn = document.getElementById("constBtn");
   btn.disabled = true;
   showOverlay("Building drift constellation — loading all decades…");
 
   try {
-    const data = await api("/sentence-constellation", { text, year_a: yearA, year_b: yearB });
+    const data = await api("/sentence-constellation", {
+      text,
+      year_a: yearA,
+      year_b: yearB,
+    });
     _lastConstellationData = data;
     renderConstellation(data);
     document.getElementById("constResults").classList.remove("hidden");
@@ -195,11 +248,15 @@ function renderConstellation(data) {
   const ref = meta.reference_year;
 
   // ── Metric cards ─────────────────────────────────────────────────────────
-  const sentScores  = meta.sentence_scores.filter(s => s !== null);
-  const maxSent     = sentScores.length ? Math.max(...sentScores).toFixed(3) : "N/A";
-  const finalSent   = sentScores.length ? sentScores[sentScores.length - 1].toFixed(3) : "N/A";
-  const topWord     = meta.stability_rank[0];
-  const bottomWord  = meta.stability_rank[meta.stability_rank.length - 1];
+  const sentScores = meta.sentence_scores.filter((s) => s !== null);
+  const maxSent = sentScores.length
+    ? Math.max(...sentScores).toFixed(3)
+    : "N/A";
+  const finalSent = sentScores.length
+    ? sentScores[sentScores.length - 1].toFixed(3)
+    : "N/A";
+  const topWord = meta.stability_rank[0];
+  const bottomWord = meta.stability_rank[meta.stability_rank.length - 1];
 
   document.getElementById("constMetrics").innerHTML = `
     <div class="metric-card">
@@ -210,7 +267,7 @@ function renderConstellation(data) {
     <div class="metric-card">
       <div class="metric-label">Decades Spanned</div>
       <div class="metric-value accent">${meta.decades.length}</div>
-      <div class="metric-sub">${meta.decades[0]} → ${meta.decades[meta.decades.length-1]}</div>
+      <div class="metric-sub">${meta.decades[0]} → ${meta.decades[meta.decades.length - 1]}</div>
     </div>
     <div class="metric-card">
       <div class="metric-label">Peak Sentence Drift</div>
@@ -224,13 +281,13 @@ function renderConstellation(data) {
     </div>
     <div class="metric-card">
       <div class="metric-label">Most Drifted Word</div>
-      <div class="metric-value" style="color:#ef4444;font-size:1rem">${topWord ? topWord.word : 'N/A'}</div>
-      <div class="metric-sub">${topWord ? topWord.max_drift.toFixed(3) : ''}</div>
+      <div class="metric-value" style="color:#ef4444;font-size:1rem">${topWord ? topWord.word : "N/A"}</div>
+      <div class="metric-sub">${topWord ? topWord.max_drift.toFixed(3) : ""}</div>
     </div>
     <div class="metric-card">
       <div class="metric-label">Most Stable Word</div>
-      <div class="metric-value" style="color:#22c55e;font-size:1rem">${bottomWord ? bottomWord.word : 'N/A'}</div>
-      <div class="metric-sub">${bottomWord ? bottomWord.max_drift.toFixed(3) : ''}</div>
+      <div class="metric-value" style="color:#22c55e;font-size:1rem">${bottomWord ? bottomWord.word : "N/A"}</div>
+      <div class="metric-sub">${bottomWord ? bottomWord.max_drift.toFixed(3) : ""}</div>
     </div>
   `;
 
@@ -242,7 +299,11 @@ function renderConstellation(data) {
       displayModeBar: true,
       modeBarButtonsToRemove: ["lasso2d", "select2d"],
       displaylogo: false,
-      toImageButtonOptions: { format: "png", filename: "drift_constellation", scale: 2 },
+      toImageButtonOptions: {
+        format: "png",
+        filename: "drift_constellation",
+        scale: 2,
+      },
     });
   } else {
     plotDiv.innerHTML = `<p style="color:#888;padding:20px">Plotly.js not loaded — ensure internet connection for interactive chart.</p>`;
@@ -265,33 +326,47 @@ function renderConstellationRankTable(rank, decades) {
     return;
   }
 
-  const rows = rank.map((r, i) => {
-    const color = CONST_PALETTE[i % CONST_PALETTE.length];
-    const driftClass = r.max_drift > 0.4 ? "high" : r.max_drift > 0.2 ? "mid" : "low";
-    const driftColor = r.max_drift > 0.4 ? "#ef4444" : r.max_drift > 0.2 ? "#facc15" : "#22c55e";
+  const rows = rank
+    .map((r, i) => {
+      const color = CONST_PALETTE[i % CONST_PALETTE.length];
+      const driftClass =
+        r.max_drift > 0.4 ? "high" : r.max_drift > 0.2 ? "mid" : "low";
+      const driftColor =
+        r.max_drift > 0.4
+          ? "#ef4444"
+          : r.max_drift > 0.2
+            ? "#facc15"
+            : "#22c55e";
 
-    // Sparkline: map scores to block chars
-    const spark = (r.scores || []).map(s => {
-      if (s === null) return '·';
-      if (s < 0.1) return '▁';
-      if (s < 0.2) return '▂';
-      if (s < 0.3) return '▃';
-      if (s < 0.4) return '▄';
-      if (s < 0.5) return '▅';
-      if (s < 0.6) return '▆';
-      return '▇';
-    }).join('');
+      // Sparkline: map scores to block chars
+      const spark = (r.scores || [])
+        .map((s) => {
+          if (s === null) return "·";
+          if (s < 0.1) return "▁";
+          if (s < 0.2) return "▂";
+          if (s < 0.3) return "▃";
+          if (s < 0.4) return "▄";
+          if (s < 0.5) return "▅";
+          if (s < 0.6) return "▆";
+          return "▇";
+        })
+        .join("");
 
-    return `<tr>
+      return `<tr>
       <td><span class="crt-swatch" style="background:${color}"></span></td>
       <td class="crt-word" style="color:${color}">${r.word}</td>
       <td class="crt-drift" style="color:${driftColor}">${r.max_drift.toFixed(4)}</td>
-      <td>${r.max_drift > 0.35 ? '<span style="color:#ef4444;font-size:.75rem">⬤ High</span>'
-             : r.max_drift > 0.15 ? '<span style="color:#facc15;font-size:.75rem">◐ Moderate</span>'
-             : '<span style="color:#22c55e;font-size:.75rem">⬤ Stable</span>'}</td>
+      <td>${
+        r.max_drift > 0.35
+          ? '<span style="color:#ef4444;font-size:.75rem">⬤ High</span>'
+          : r.max_drift > 0.15
+            ? '<span style="color:#facc15;font-size:.75rem">◐ Moderate</span>'
+            : '<span style="color:#22c55e;font-size:.75rem">⬤ Stable</span>'
+      }</td>
       <td class="crt-sparkline" title="Decade-by-decade drift">${spark}</td>
     </tr>`;
-  }).join("");
+    })
+    .join("");
 
   document.getElementById("constRankTable").innerHTML = `
     <table class="const-rank-table">
@@ -314,12 +389,16 @@ function downloadConstellationChart() {
   a.click();
 }
 async function runExplorer() {
-  const word = document.getElementById("explorerWord").value.trim().toLowerCase();
+  const word = document
+    .getElementById("explorerWord")
+    .value.trim()
+    .toLowerCase();
   const yearA = parseInt(document.getElementById("explorerYearA").value);
   const yearB = parseInt(document.getElementById("explorerYearB").value);
 
   if (!word) return toast("Enter a word first", "error");
-  if (yearA >= yearB) return toast("From decade must be earlier than To decade", "error");
+  if (yearA >= yearB)
+    return toast("From decade must be earlier than To decade", "error");
 
   showOverlay(`Analysing '${word}'…`);
 
@@ -340,7 +419,14 @@ async function runExplorer() {
   }
 }
 
-function renderExplorerResults(word, yearA, yearB, drift, tsneData, nsChartData) {
+function renderExplorerResults(
+  word,
+  yearA,
+  yearB,
+  drift,
+  tsneData,
+  nsChartData,
+) {
   // ── Metrics ──────────────────────────────────────────────────────────────
   const score = drift.drift_score;
   const scoreClass = score > 0.5 ? "high" : score > 0.25 ? "mid" : "low";
@@ -361,7 +447,7 @@ function renderExplorerResults(word, yearA, yearB, drift, tsneData, nsChartData)
     </div>
     <div class="metric-card">
       <div class="metric-label">Jaccard Overlap</div>
-      <div class="metric-value ${jacc > 0.5 ? 'low' : jacc > 0.25 ? 'mid' : 'high'}">${jacc.toFixed(3)}</div>
+      <div class="metric-value ${jacc > 0.5 ? "low" : jacc > 0.25 ? "mid" : "high"}">${jacc.toFixed(3)}</div>
       <div class="metric-sub">Neighbour similarity</div>
     </div>
     <div class="metric-card">
@@ -371,7 +457,7 @@ function renderExplorerResults(word, yearA, yearB, drift, tsneData, nsChartData)
     </div>
     <div class="metric-card">
       <div class="metric-label">Lost Contexts</div>
-      <div class="metric-value ${ns.lost.length > 5 ? 'mid' : 'low'}">${ns.lost.length}</div>
+      <div class="metric-value ${ns.lost.length > 5 ? "mid" : "low"}">${ns.lost.length}</div>
       <div class="metric-sub">Dropped neighbours</div>
     </div>
   `;
@@ -381,17 +467,21 @@ function renderExplorerResults(word, yearA, yearB, drift, tsneData, nsChartData)
   const gainedSet = new Set(ns.gained);
 
   function renderNbrList(containerId, neighbours, era, color) {
-    const items = neighbours.map(([w, sim]) => {
-      let badge = "";
-      if (sharedSet.has(w)) badge = `<span class="nbr-badge shared-badge">shared</span>`;
-      else if (gainedSet.has(w)) badge = `<span class="nbr-badge gained-badge">gained</span>`;
-      else badge = `<span class="nbr-badge lost-badge">lost</span>`;
-      return `<li class="nbr-item">
+    const items = neighbours
+      .map(([w, sim]) => {
+        let badge = "";
+        if (sharedSet.has(w))
+          badge = `<span class="nbr-badge shared-badge">shared</span>`;
+        else if (gainedSet.has(w))
+          badge = `<span class="nbr-badge gained-badge">gained</span>`;
+        else badge = `<span class="nbr-badge lost-badge">lost</span>`;
+        return `<li class="nbr-item">
         <span class="nbr-word" style="color:${color}">${w}</span>
         ${badge}
         <span class="nbr-sim">${sim.toFixed(3)}</span>
       </li>`;
-    }).join("");
+      })
+      .join("");
 
     document.getElementById(containerId).innerHTML = `
       <div class="nbr-title" style="color:${color}">Context in ${era}</div>
@@ -436,7 +526,10 @@ function quickTimeline(word) {
 }
 
 async function runTimeline() {
-  const word = document.getElementById("timelineWord").value.trim().toLowerCase();
+  const word = document
+    .getElementById("timelineWord")
+    .value.trim()
+    .toLowerCase();
   if (!word) return toast("Enter a word", "error");
 
   showOverlay(`Building timeline for '${word}'…`);
@@ -447,18 +540,23 @@ async function runTimeline() {
       `Drift Timeline — '${word}' (ref: ${loadedDecades[0]})`;
 
     // Build table
-    const rows = data.years.map((yr, i) => {
-      const s = data.scores[i];
-      const pct = s != null ? (s * 100).toFixed(1) : null;
-      const bar = s != null ? `<div class="drift-bar-bg"><div class="drift-bar-fill" style="width:${pct}%"></div></div>` : "—";
-      const present = data.present_in[i] ? "✓" : "✗";
-      return `<tr>
+    const rows = data.years
+      .map((yr, i) => {
+        const s = data.scores[i];
+        const pct = s != null ? (s * 100).toFixed(1) : null;
+        const bar =
+          s != null
+            ? `<div class="drift-bar-bg"><div class="drift-bar-fill" style="width:${pct}%"></div></div>`
+            : "—";
+        const present = data.present_in[i] ? "✓" : "✗";
+        return `<tr>
         <td>${yr}</td>
-        <td style="color:${data.present_in[i] ? 'var(--green)' : 'var(--red)'}">${present}</td>
+        <td style="color:${data.present_in[i] ? "var(--green)" : "var(--red)"}">${present}</td>
         <td>${s != null ? s.toFixed(4) : "—"}</td>
         <td class="drift-bar-cell">${bar}</td>
       </tr>`;
-    }).join("");
+      })
+      .join("");
 
     document.getElementById("timelineTableBody").innerHTML = `
       <table class="decade-table">
@@ -488,7 +586,11 @@ function setHeatmapPreset(key) {
 
 async function runHeatmap() {
   const raw = document.getElementById("heatmapWords").value;
-  const words = raw.split(",").map(w => w.trim().toLowerCase()).filter(Boolean).slice(0, 15);
+  const words = raw
+    .split(",")
+    .map((w) => w.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 15);
   if (words.length < 2) return toast("Enter at least 2 words", "error");
 
   showOverlay("Building heatmap…");
@@ -509,7 +611,8 @@ async function runTopDrifted() {
   const yearA = parseInt(document.getElementById("topYearA").value);
   const yearB = parseInt(document.getElementById("topYearB").value);
   const topN = parseInt(document.getElementById("topN").value);
-  if (yearA >= yearB) return toast("From decade must be earlier than To decade", "error");
+  if (yearA >= yearB)
+    return toast("From decade must be earlier than To decade", "error");
 
   showOverlay("Ranking vocabulary — this may take a minute…");
   try {
@@ -523,13 +626,17 @@ async function runTopDrifted() {
     b64Img(barData.image, "topBarChart");
     b64Img(wc.image, "topWordCloud");
 
-    const rows = top.results.map((r, i) => `
+    const rows = top.results
+      .map(
+        (r, i) => `
       <tr>
         <td class="rank-num">#${i + 1}</td>
         <td class="rank-word">${r.word}</td>
         <td class="rank-drift">${r.drift.toFixed(4)}</td>
         <td><div class="drift-bar-bg"><div class="drift-bar-fill" style="width:${(r.drift * 100).toFixed(1)}%"></div></div></td>
-      </tr>`).join("");
+      </tr>`,
+      )
+      .join("");
 
     document.getElementById("topTable").innerHTML = `
       <table class="rank-table">
@@ -551,12 +658,14 @@ async function runConcepts() {
   const raw = document.getElementById("pairsInput").value.trim();
   if (!raw) return toast("Enter word pairs", "error");
 
-  const pairs = raw.split("\n")
-    .map(line => line.split(",").map(w => w.trim().toLowerCase()))
-    .filter(p => p.length === 2 && p[0] && p[1])
+  const pairs = raw
+    .split("\n")
+    .map((line) => line.split(",").map((w) => w.trim().toLowerCase()))
+    .filter((p) => p.length === 2 && p[0] && p[1])
     .slice(0, 5);
 
-  if (!pairs.length) return toast("Enter valid pairs (word1, word2 per line)", "error");
+  if (!pairs.length)
+    return toast("Enter valid pairs (word1, word2 per line)", "error");
 
   showOverlay("Tracking concept relations…");
   try {
@@ -584,7 +693,9 @@ async function loadCaseStudies() {
 function renderCaseStudies(cases) {
   const grid = document.getElementById("caseGrid");
   if (!grid) return;
-  grid.innerHTML = cases.map(cs => `
+  grid.innerHTML = cases
+    .map(
+      (cs) => `
     <div class="case-card">
       <div class="case-word">${cs.word}</div>
       <div class="case-type">${cs.type}</div>
@@ -594,13 +705,19 @@ function renderCaseStudies(cases) {
         ▷ Run Analysis
       </button>
     </div>
-  `).join("");
+  `,
+    )
+    .join("");
 }
 
 function runCaseStudy(word, yearA, yearB) {
   // Switch to explorer tab and run
-  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  document
+    .querySelectorAll(".tab-btn")
+    .forEach((b) => b.classList.remove("active"));
+  document
+    .querySelectorAll(".tab-panel")
+    .forEach((p) => p.classList.remove("active"));
 
   const btn = document.querySelector('[data-tab="explorer"]');
   btn.classList.add("active");

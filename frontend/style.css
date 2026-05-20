@@ -40,8 +40,8 @@
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   --shadow-glow: 0 0 40px rgba(168, 85, 247, 0.18);
 
-  --font: 'Inter', system-ui, sans-serif;
-  --mono: 'JetBrains Mono', monospace;
+  --font: "Inter", system-ui, sans-serif;
+  --mono: "JetBrains Mono", monospace;
 
   --header-h: 70px;
   --nav-h: 52px;
@@ -62,15 +62,108 @@ body {
 
 /* Animated gradient background */
 body::before {
-  content: '';
+  content: "";
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse at 20% 20%, rgba(168, 85, 247, 0.12) 0%, transparent 55%),
-    radial-gradient(ellipse at 80% 80%, rgba(6, 182, 212, 0.08) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 50%, rgba(124, 58, 237, 0.06) 0%, transparent 70%);
+    radial-gradient(
+      ellipse at 20% 20%,
+      rgba(168, 85, 247, 0.12) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 80% 80%,
+      rgba(6, 182, 212, 0.08) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 50% 50%,
+      rgba(124, 58, 237, 0.06) 0%,
+      transparent 70%
+    );
   pointer-events: none;
   z-index: 0;
+}
+
+/* ── Offline Banner ────────────────────────────────────────────────────── */
+.offline-banner {
+  position: fixed;
+  top: var(--header-h);
+  left: 0;
+  right: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(239, 68, 68, 0.15),
+    rgba(245, 158, 11, 0.15)
+  );
+  border-bottom: 1px solid rgba(239, 68, 68, 0.3);
+  backdrop-filter: blur(10px);
+  padding: 12px 28px;
+  z-index: 99;
+  transition: all 0.3s ease;
+}
+
+.offline-banner.hidden {
+  display: none;
+}
+
+.banner-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--text);
+}
+
+.banner-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.banner-text {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.banner-text strong {
+  display: block;
+  font-weight: 600;
+  color: var(--gold);
+  margin-bottom: 2px;
+}
+
+.banner-text code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--blue);
+}
+
+.banner-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 8px;
+  transition: color 0.2s ease;
+}
+
+.banner-close:hover {
+  color: var(--text);
+}
+
+/* ── Layout Adjustment When Banner is Visible ──────────────────────────── */
+body.banner-visible .tab-nav {
+  top: calc(var(--header-h) + 50px);
+}
+
+body.banner-visible .main-content {
+  margin-top: calc(var(--header-h) + 50px + var(--nav-h));
 }
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
@@ -257,7 +350,9 @@ body::before {
   border-radius: var(--radius);
   padding: 20px 22px;
   backdrop-filter: blur(8px);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .card:hover {
@@ -275,7 +370,8 @@ body::before {
   font-size: 0.78rem;
 }
 
-.chart-card {}
+.chart-card {
+}
 
 .chart-card.large {
   min-height: 550px;
@@ -313,7 +409,7 @@ body::before {
 }
 
 .chart-loading::before {
-  content: '';
+  content: "";
   width: 18px;
   height: 18px;
   border: 2px solid var(--border2);
@@ -370,7 +466,9 @@ textarea {
   font-size: 0.88rem;
   padding: 10px 14px;
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
   width: 100%;
 }
 
@@ -401,7 +499,10 @@ textarea {
   font-size: 0.88rem;
   font-weight: 600;
   padding: 11px 22px;
-  transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+  transition:
+    opacity 0.2s,
+    transform 0.15s,
+    box-shadow 0.2s;
   white-space: nowrap;
   display: flex;
   align-items: center;
@@ -702,7 +803,7 @@ textarea {
 }
 
 .case-card::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.06), transparent);
@@ -814,7 +915,8 @@ textarea {
   gap: 16px;
 }
 
-.about-card {}
+.about-card {
+}
 
 .info-table {
   width: 100%;
@@ -1093,8 +1195,12 @@ textarea {
   gap: 6px;
   margin-top: 10px;
   padding: 5px 14px;
-  background: linear-gradient(135deg, rgba(250,204,21,0.12), rgba(168,85,247,0.12));
-  border: 1px solid rgba(250,204,21,0.3);
+  background: linear-gradient(
+    135deg,
+    rgba(250, 204, 21, 0.12),
+    rgba(168, 85, 247, 0.12)
+  );
+  border: 1px solid rgba(250, 204, 21, 0.3);
   border-radius: 20px;
   font-size: 0.78rem;
   font-weight: 600;
@@ -1103,7 +1209,7 @@ textarea {
 
 /* ── Secondary Button ────────────────────────────────────────────────────── */
 .btn-secondary {
-  background: rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--border2);
   border-radius: var(--radius-sm);
   color: var(--text-muted);
@@ -1116,7 +1222,7 @@ textarea {
   white-space: nowrap;
 }
 .btn-secondary:hover {
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.1);
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -1137,18 +1243,27 @@ textarea {
 }
 .const-rank-table td {
   padding: 8px 12px;
-  border-bottom: 1px solid rgba(255,255,255,0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
-.const-rank-table tr:hover td { background: rgba(168,85,247,0.04); }
+.const-rank-table tr:hover td {
+  background: rgba(168, 85, 247, 0.04);
+}
 .crt-swatch {
   display: inline-block;
-  width: 10px; height: 10px;
+  width: 10px;
+  height: 10px;
   border-radius: 2px;
   margin-right: 6px;
   vertical-align: middle;
 }
-.crt-word  { font-family: var(--mono); font-weight: 600; }
-.crt-drift { font-family: var(--mono); font-size: 0.82rem; }
+.crt-word {
+  font-family: var(--mono);
+  font-weight: 600;
+}
+.crt-drift {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+}
 .crt-sparkline {
   font-family: var(--mono);
   font-size: 0.7rem;
